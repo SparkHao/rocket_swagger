@@ -1,7 +1,11 @@
-use rocket::form::FromForm;
+use rocket::form::{FromForm, Form};
+use rocket::fs::TempFile;
+use rocket::serde::json::Value;
+use rocket::serde::json::serde_json::json;
 use rocket::{get, post, serde::json::Json};
 use rocket_okapi::okapi::schemars;
 use rocket_okapi::okapi::schemars::JsonSchema;
+use rocket_okapi::okapi::schemars::gen::SchemaGenerator;
 use rocket_okapi::settings::UrlObject;
 use rocket_okapi::{openapi, openapi_get_routes, rapidoc::*, swagger_ui::*};
 use serde::{Deserialize, Serialize};
@@ -102,6 +106,7 @@ async fn main() {
                 create_user,
                 hidden,
                 create_post_by_query,
+                upload,
             ],
         )
         .mount(
@@ -132,4 +137,35 @@ async fn main() {
         Ok(_) => println!("Rocket shut down gracefully."),
         Err(err) => println!("Rocket had an error: {}", err),
     };
+}
+
+
+#[derive(FromForm, JsonSchema, Debug)]
+pub struct FileUploadForm<'f> {
+    file: UploadFile<'f>,
+}
+
+#[derive(Debug)]
+struct UploadFile<'f>{
+    pub file: TempFile<'f>
+}
+
+impl<'a> JsonSchema for UploadFile<'a> {
+    fn schema_name() -> String {
+        "TempFile".to_owned()
+    }
+    fn json_schema( _: &mut SchemaGenerator ) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject::default().into()
+    }
+}
+
+use rocket::form::FromFormField;
+impl<'__f> FromFormField<'_> for UploadFile<'__f> {
+}
+
+#[openapi(tag = "v1")]
+#[post("/upload", data = "<form>")]
+pub async fn upload(mut form: Form<FileUploadForm<'_>>) -> Value {
+    println!("form: {:?}", form);
+    json!({"status": "ok"})
 }
